@@ -1,3 +1,4 @@
+#define DEBUG
 #include <iostream>
 #include "parser.h"
 using namespace std;

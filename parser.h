@@ -12,7 +12,7 @@ namespace tmc {
     struct Action
     {
         enum Type {
-            none, set, input, echo, tag,
+            None, Set, Input, Echo, Tag, If, Goto,
             error = 0xff
         };
         Type type;
@@ -20,7 +20,6 @@ namespace tmc {
         std::string arg2;
         std::string arg3;
         bool hasVar;
-        size_t fork;
     };
     
     const char *commands[] = {
@@ -29,15 +28,25 @@ namespace tmc {
         "input",
         "echo",
         ":tag",
+        "if",
+        "goto"
     };
     class Parser
     {
 
         std::vector<Action> actions;
         std::stack<size_t> current;
-        void parseLine(const std::string &line, size_t n = 0)
+        Action parseLine(const std::string &line, size_t n = 0)
         {
             Action action;
+
+            // empty line and comment
+            if (line == "" || line.at(0) == '#')
+            {
+                action.type = Action::Type::None;
+                return action;
+            }
+
             std::string s;
             static std::stringstream ss;
             ss.clear();
@@ -63,23 +72,40 @@ namespace tmc {
             // determine args
             switch (action.type)
             {
-                case Action::Type::set:
+                case Action::Type::Set:
+                    // set arg1 = arg2
                     getUntil(ss, action.arg1, '=') || syntaxError(n);
                     getUntil(ss, action.arg2, '\n', true, false);
                     break;
-                case Action::Type::input:
+                case Action::Type::Input:
+                    // input arg1
                     getUntil(ss, action.arg1);
                     action.arg1.size() > 0 || syntaxError(n);
                     break;
-                case Action::Type::echo:
+                case Action::Type::Echo:
+                    // echo arg1
                     getUntil(ss, action.arg1, '\n', true, false);
                     break;
-                case Action::Type::tag:
+                case Action::Type::Tag:
+                    // :tag arg1
                     getUntil(ss, action.arg1);
                     action.arg1.size() > 0 || syntaxError(n);
                     setTag(n, action.arg1);
                     break;
-                case Action::Type::none:
+                case Action::Type::If:
+                    // if [arg1 = arg2] arg3(fork)
+                    getUntil(ss, action.arg1, '[') || syntaxError(n);
+                    getUntil(ss, action.arg1, '=') || syntaxError(n);
+                    getUntil(ss, action.arg2, ']') || syntaxError(n);
+                    getUntil(ss, action.arg3);
+                    action.arg3.size() > 0 || syntaxError(n);
+                    break;
+                case Action::Type::Goto:
+                    // goto arg1
+                    getUntil(ss, action.arg1);
+                    action.arg1.size() > 0 || syntaxError(n);
+                    break;
+                case Action::Type::None:
                 default:
                     break;
             }
@@ -108,8 +134,9 @@ namespace tmc {
                     break;
                 }
             }
-            actions.emplace_back(action);
+            return action;
         }
+
         bool syntaxError(size_t n)
         {
             stringstream ss;
@@ -127,47 +154,77 @@ namespace tmc {
             {
                 getline(in, temp);
                 if (!in) break;
-                parseLine(temp);
+                actions.emplace_back(parseLine(temp, actions.size() + 1));
             }
         }
         void exec()
         {
-            exec(0);
-        }
-        void exec(size_t n)
-        {
-            while (n < actions.size())
+            #ifdef DEBUG
+            cout << "---begin exec---\n";
+            #endif
+            for (size_t i = 0; i < actions.size();)
             {
-                switch (actions[n].type)
-                {
-                    case Action::Type::set:
-                        cout << "set";
-                        break;
-                    case Action::Type::input:
-                        cout << "input";
-                        break;
-                    case Action::Type::echo:
-                        cout << "echo";
-                        break;
-                    case Action::Type::tag:
-                        cout << "tag";
-                        break;
-                    default:
-                        break;
-                }
-                cout << endl;
-                ++n;
+                i = exec(actions[i], i);
             }
         }
+        size_t exec(const Action &action, size_t n)
+        {
+            switch (action.type)
+            {
+                case Action::Type::Set:
+                    setVariable(action.arg1, action.arg2);
+                    break;
+                case Action::Type::Input:
+                    getInput(action.arg1);
+                    break;
+                case Action::Type::Echo:
+                    print(action.arg1);
+                    break;
+                case Action::Type::If:
+                    // cout << "if[" << action.arg1 << "=" << action.arg2 << "]" << action.fork->type << endl;
+                    if (action.arg1 == action.arg2)
+                        return exec(parseLine(action.arg3, n), n);
+                    break;
+                case Action::Type::Goto:
+                    return jump(action.arg1);
+                case Action::Type::Tag:
+                default:
+                    break;
+            }
+            return n + 1;
+        }
         std::string extendVariable(const std::string &line) {}
-        void setVariable(const std::string &key, const std::string &data) {}
+        void setVariable(const std::string &key, const std::string &data)
+        {
+            #ifdef DEBUG
+            cout << "set(" << key << ", " << data << ")\n";
+            #endif
+        }
         void getVariable(const std::string &key) {}
-        void getInput(const std::string &variableKey) {}
-        void print(const std::string &str) {}
-        void setTag(int n, const std::string &tag) {}
-        void jump(const std::string &tag) {}
-        void call(const std::string &tag) {}
-        void returnCall() {}
+        void getInput(const std::string &variableKey)
+        {
+            #ifdef DEBUG
+            cout << "input(" << variableKey << ")\n";
+            #endif
+        }
+        void print(const std::string &str)
+        {
+            #ifdef DEBUG
+            cout << "print(" << str << ")\n";
+            #endif
+        }
+        void setTag(size_t n, const std::string &tag)
+        {
+            #ifdef DEBUG
+            cout << "setTag(" << n << ", " << tag << ")\n";
+            #endif
+        }
+        size_t jump(const std::string &tag)
+        {
+            #ifdef DEBUG
+            cout << "jump(" << tag << ")\n";
+            #endif
+        }
         /* Ignore the very first and ending blank characters */
         bool getUntil(std::istream &in, std::string &str, const char c = '\n',
                       bool ltrim = true, bool rtrim = true, bool drop = true)

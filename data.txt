@@ -2,3 +2,5 @@ set var = xxx xxx
 input var
 echo xxx
 :tag tag1
+if [xx = xx] echo xx
+goto tag1
