@@ -8,58 +8,117 @@
 #include <fstream>
 
 namespace tmc {
-    typedef struct Line
+    using namespace std;
+    struct Action
     {
-        int n;
-        string content;
-    } Tag, Error;
-
-    struct Script
-    {
-        std::vector<Line> content;
-        std::vector<Tag> tags;
+        enum Type {
+            none, set, input, echo, tag,
+            error = 0xff
+        };
+        Type type;
+        std::string arg1;
+        std::string arg2;
+        std::string arg3;
+        bool hasVar;
+        size_t fork;
     };
-
+    
+    const char *commands[] = {
+        "",
+        "set",
+        "input",
+        "echo",
+        ":tag",
+    };
     class Parser
     {
-        Script script;
-        std::stack<int> current;
-        Error e;
-        /* From script.content parse script.tags and Check syntax*/
-        void parse()
+
+        std::vector<Action> actions;
+        std::stack<size_t> current;
+        void parseLine(const std::string &line, size_t n = 0)
         {
-            std::stringstream ss;
-            std::string s1, s2;
-            for (auto &line : script.content)
+            Action action;
+            std::string s;
+            static std::stringstream ss;
+            ss.clear();
+            ss.sync();
+            ss.str(line);
+            ss >> s;
+
+            // determine type
+            action.type = Action::Type::error;
+            for (int i = 0; i < sizeof(commands)/sizeof(char *); ++i)
+            {
+                if (s == commands[i])
+                    action.type = Action::Type(i);
+            }
+            if (action.type == Action::Type::error)
             {
                 ss.clear();
-                s1 = s2 = "";
-                line.content = extendVariable(line.content);
-                ss.str(line.content);
-                ss >> s1;
-                if (s1 == SET)
-                {
-                    s1 = "";
-                    getUntil(ss, s1, '=');
-                    getUntil(ss, s2);
-                    setVariable(s1, s2);
-                } else if (s1 == INPUT)
-                {
-                    getUntil(ss, s2);
-                    getInput(s2);
-                } else if (s1 == ECHO)
-                {
-                    getUntil(ss, s2);
-                    print(s2);
-                } else if (s1 == TAG)
-                {
-                    getUntil(ss, s2);
-                    setTag(line.n, s2);
-                } // todo
+                ss.sync();
+                ss << "Unknown command `" << s << "` in line " << n;
+                throw ss.str();
             }
+
+            // determine args
+            switch (action.type)
+            {
+                case Action::Type::set:
+                    getUntil(ss, action.arg1, '=') || syntaxError(n);
+                    getUntil(ss, action.arg2, '\n', true, false);
+                    break;
+                case Action::Type::input:
+                    getUntil(ss, action.arg1);
+                    action.arg1.size() > 0 || syntaxError(n);
+                    break;
+                case Action::Type::echo:
+                    getUntil(ss, action.arg1, '\n', true, false);
+                    break;
+                case Action::Type::tag:
+                    getUntil(ss, action.arg1);
+                    action.arg1.size() > 0 || syntaxError(n);
+                    setTag(n, action.arg1);
+                    break;
+                case Action::Type::none:
+                default:
+                    break;
+            }
+
+            // determine if there is variable in args
+            action.hasVar = false;
+            for (auto &i : {action.arg1, action.arg2, action.arg3})
+            {
+                auto it = i.begin();
+                // 0: waiting for '$'
+                // 1: waiting for '{'
+                // 2: waiting for '}'
+                // 3: variable found
+                int state = 0;
+                while (it != i.end())
+                {
+                    if (*it == '$' && state == 0) ++state;
+                    else if (*it == '{' && state == 1) ++state;
+                    else if (*it == '}' && state == 2) { ++state; break; }
+                    else if (state == 1) state = 0;
+                    ++it;
+                }
+                if (state == 3)
+                {
+                    action.hasVar = true;
+                    break;
+                }
+            }
+            actions.emplace_back(action);
+        }
+        bool syntaxError(size_t n)
+        {
+            stringstream ss;
+            ss << "Syntax error in line " << n;
+            throw ss.str();
+            return false;
         }
     public:
-        Parser(std::ifstream &in): e({-1, ""}), current({0})
+        Parser(std::ifstream &in)
         {
             if (!in)
                 return;
@@ -67,29 +126,63 @@ namespace tmc {
             while (in)
             {
                 getline(in, temp);
-                script.content.push_back(temp);
+                if (!in) break;
+                parseLine(temp);
             }
-            parse();
         }
-        void exec();
-        void exec(const std::string &line);
-        string extendVariable(const string &line);
-        void setVariable(const string &key, const std::string &data);
-        void getVariable(const std::string &key);
-        void getInput(const std::string &variableKey);
-        void print(const std::string &str);
-        void setTag(int n, const std::string &tag);
-        void jump(const std::string &tag);
-        void call(const std::string &tag);
-        void returnCall();
-        /* Ignore the very first and ending blank characters */
-        bool getUntil(std::istream &in, std::string &str, const char c = '\n', bool drop = true)
+        void exec()
         {
-            bool done = false;
-            char buff;
-            while (in && !done)
+            exec(0);
+        }
+        void exec(size_t n)
+        {
+            while (n < actions.size())
             {
-                in >> buff;
+                switch (actions[n].type)
+                {
+                    case Action::Type::set:
+                        cout << "set";
+                        break;
+                    case Action::Type::input:
+                        cout << "input";
+                        break;
+                    case Action::Type::echo:
+                        cout << "echo";
+                        break;
+                    case Action::Type::tag:
+                        cout << "tag";
+                        break;
+                    default:
+                        break;
+                }
+                cout << endl;
+                ++n;
+            }
+        }
+        std::string extendVariable(const std::string &line) {}
+        void setVariable(const std::string &key, const std::string &data) {}
+        void getVariable(const std::string &key) {}
+        void getInput(const std::string &variableKey) {}
+        void print(const std::string &str) {}
+        void setTag(int n, const std::string &tag) {}
+        void jump(const std::string &tag) {}
+        void call(const std::string &tag) {}
+        void returnCall() {}
+        /* Ignore the very first and ending blank characters */
+        bool getUntil(std::istream &in, std::string &str, const char c = '\n',
+                      bool ltrim = true, bool rtrim = true, bool drop = true)
+        {
+            bool done = false, reading = false;
+            char buff;
+            while (!done)
+            {
+                in.get(buff);
+                if (!in) break;
+                // trim the very beginning blank characters
+                if (!reading && ltrim)
+                    if (buff == ' ' || buff == '\t') continue;
+                reading = true;
+
                 if (buff == c)
                 {
                     if (!drop)
@@ -101,23 +194,24 @@ namespace tmc {
             }
 
             // trim the ending blank characters
-            auto i = str.end();
-            while (i != str.begin())
+            if (rtrim)
             {
-                --i;
-                if (*i == ' ' || *i == '\t')
-                    continue;
-                ++i;
-                break;
+                auto i = str.end();
+                while (i != str.begin())
+                {
+                    --i;
+                    if (*i == ' ' || *i == '\t')
+                        continue;
+                    ++i;
+                    break;
+                }
+                str.erase(i, str.end());
             }
-            str.erase(i, str.end());
+
+            // returns if we met the ending character
             return done;
         }
 
-        static const char *SET = "set";
-        static const char *INPUT = "input";
-        static const char *ECHO = "echo";
-        static const char *TAG = ":tag";
     };
 }    
 #endif

@@ -2,4 +2,3 @@ set var = xxx xxx
 input var
 echo xxx
 :tag tag1
-if [${var} = hello] jump tag1
