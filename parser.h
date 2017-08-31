@@ -4,7 +4,7 @@
 #include <string>
 #include <sstream>
 #include <vector>
-#include <stack>
+#include <map>
 #include <fstream>
 
 namespace tmc {
@@ -16,9 +16,9 @@ namespace tmc {
             error = 0xff
         };
         Type type;
-        std::string arg1;
-        std::string arg2;
-        std::string arg3;
+        string arg1;
+        string arg2;
+        string arg3;
         bool hasVar;
     };
     
@@ -34,9 +34,9 @@ namespace tmc {
     class Parser
     {
 
-        std::vector<Action> actions;
-        std::stack<size_t> current;
-        Action parseLine(const std::string &line, size_t n = 0)
+        vector<Action> actions;
+        map<string, string> variables;
+        Action parseLine(const string &line, size_t n = 0)
         {
             Action action;
 
@@ -47,8 +47,8 @@ namespace tmc {
                 return action;
             }
 
-            std::string s;
-            static std::stringstream ss;
+            string s;
+            static stringstream ss;
             ss.clear();
             ss.sync();
             ss.str(line);
@@ -145,11 +145,11 @@ namespace tmc {
             return false;
         }
     public:
-        Parser(std::ifstream &in)
+        Parser(ifstream &in)
         {
             if (!in)
                 return;
-            std::string temp;
+            string temp;
             while (in)
             {
                 getline(in, temp);
@@ -167,8 +167,16 @@ namespace tmc {
                 i = exec(actions[i], i);
             }
         }
-        size_t exec(const Action &action, size_t n)
+        size_t exec(Action action, size_t n)
         {
+            // extend var
+            if (action.hasVar)
+            {
+                action.arg1 = extendVariable(action.arg1);
+                action.arg2 = extendVariable(action.arg2);
+                action.arg3 = extendVariable(action.arg3);
+            }
+
             switch (action.type)
             {
                 case Action::Type::Set:
@@ -193,40 +201,75 @@ namespace tmc {
             }
             return n + 1;
         }
-        std::string extendVariable(const std::string &line) {}
-        void setVariable(const std::string &key, const std::string &data)
+
+        string extendVariable(string str)
+        {
+            #ifdef DEBUG
+            cout << "[extending " << str << "]\n";
+            #endif
+            // find the very inner variable mark
+            string::size_type beg = 0, end = 0;
+            while (end != string::npos)
+            {
+                beg = str.find("${", end);
+                end = str.find("${", beg + 1);
+            }
+            end = str.find("}", beg);
+
+            // no longer variable exist
+            if (beg == string::npos || end == string::npos)
+                return str;
+
+            #ifdef DEBUG
+            cout << "[expanded ${" << str.substr(beg + 2, end - beg - 2) << "} = " << getVariable(str.substr(beg + 2, end - beg - 2)) <<"]\n";
+            #endif
+
+            str = str.replace(beg, end - beg + 1,
+                getVariable(str.substr(beg + 2, end - beg - 2)));
+            return extendVariable(str);
+        }
+
+        void setVariable(const string &key, const string &data)
         {
             #ifdef DEBUG
             cout << "set(" << key << ", " << data << ")\n";
             #endif
+            variables[key] = data;
         }
-        void getVariable(const std::string &key) {}
-        void getInput(const std::string &variableKey)
+
+        string getVariable(const string &key)
+        {
+            if (variables.count(key) > 0)
+                return variables[key];
+            return "";
+        }
+
+        void getInput(const string &variableKey)
         {
             #ifdef DEBUG
             cout << "input(" << variableKey << ")\n";
             #endif
         }
-        void print(const std::string &str)
+        void print(const string &str)
         {
             #ifdef DEBUG
             cout << "print(" << str << ")\n";
             #endif
         }
-        void setTag(size_t n, const std::string &tag)
+        void setTag(size_t n, const string &tag)
         {
             #ifdef DEBUG
             cout << "setTag(" << n << ", " << tag << ")\n";
             #endif
         }
-        size_t jump(const std::string &tag)
+        size_t jump(const string &tag)
         {
             #ifdef DEBUG
             cout << "jump(" << tag << ")\n";
             #endif
         }
         /* Ignore the very first and ending blank characters */
-        bool getUntil(std::istream &in, std::string &str, const char c = '\n',
+        bool getUntil(istream &in, string &str, const char c = '\n',
                       bool ltrim = true, bool rtrim = true, bool drop = true)
         {
             bool done = false, reading = false;

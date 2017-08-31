@@ -1,6 +1,8 @@
-set var = xxx xxx
+set var = a
+set a = hello
 input var
-echo xxx
+echo ${var}
+echo ${${var}}
 :tag tag1
 if [xx = xx] echo xx
 goto tag1
