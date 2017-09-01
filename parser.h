@@ -6,13 +6,14 @@
 #include <vector>
 #include <map>
 #include <fstream>
+#include <cstdint>
 
 namespace tmc {
     using namespace std;
     struct Action
     {
         enum Type {
-            None, Set, Input, Echo, Tag, If, Goto,
+            None, Set, Input, Echo, Tag, If, Goto, Echol,
             error = 0xff
         };
         Type type;
@@ -29,13 +30,17 @@ namespace tmc {
         "echo",
         ":tag",
         "if",
-        "goto"
+        "goto",
+        "echol"
     };
+
     class Parser
     {
 
         vector<Action> actions;
         map<string, string> variables;
+        map<string, size_t> tags;
+
         Action parseLine(const string &line, size_t n = 0)
         {
             Action action;
@@ -83,6 +88,7 @@ namespace tmc {
                     action.arg1.size() > 0 || syntaxError(n);
                     break;
                 case Action::Type::Echo:
+                case Action::Type::Echol:
                     // echo arg1
                     getUntil(ss, action.arg1, '\n', true, false);
                     break;
@@ -145,11 +151,23 @@ namespace tmc {
             return false;
         }
     public:
-        Parser(ifstream &in)
+        Parser()
         {
-            if (!in)
-                return;
+            reset();
+        }
+
+        void reset()
+        {
+            actions.clear();
+            variables.clear();
+            tags.clear();
+            tags["eof"] = INT_MAX;
+        }
+
+        void parse(ifstream &in)
+        {
             string temp;
+            reset();
             while (in)
             {
                 getline(in, temp);
@@ -157,6 +175,7 @@ namespace tmc {
                 actions.emplace_back(parseLine(temp, actions.size() + 1));
             }
         }
+
         void exec()
         {
             #ifdef DEBUG
@@ -187,6 +206,9 @@ namespace tmc {
                     break;
                 case Action::Type::Echo:
                     print(action.arg1);
+                    break;
+                case Action::Type::Echol:
+                    print(action.arg1 + "\n");
                     break;
                 case Action::Type::If:
                     // cout << "if[" << action.arg1 << "=" << action.arg2 << "]" << action.fork->type << endl;
@@ -249,25 +271,40 @@ namespace tmc {
             #ifdef DEBUG
             cout << "input(" << variableKey << ")\n";
             #endif
+
+            string temp;
+            getline(cin, temp);
+            setVariable(variableKey, temp);
         }
         void print(const string &str)
         {
             #ifdef DEBUG
             cout << "print(" << str << ")\n";
             #endif
+
+            if (str == "")
+                cout << endl;
+            else
+                cout << str;
         }
+
         void setTag(size_t n, const string &tag)
         {
             #ifdef DEBUG
             cout << "setTag(" << n << ", " << tag << ")\n";
             #endif
+
+            tags[tag] = n;
         }
         size_t jump(const string &tag)
         {
             #ifdef DEBUG
             cout << "jump(" << tag << ")\n";
             #endif
+
+            return tags.at(tag);
         }
+
         /* Ignore the very first and ending blank characters */
         bool getUntil(istream &in, string &str, const char c = '\n',
                       bool ltrim = true, bool rtrim = true, bool drop = true)

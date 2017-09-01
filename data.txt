@@ -1,8 +1,11 @@
-set var = a
-set a = hello
+set var = Nothing
+echo Input something > 
 input var
-echo ${var}
-echo ${${var}}
-:tag tag1
-if [xx = xx] echo xx
-goto tag1
+echol Your input is "${var}"
+if [a = ${var}] goto if
+goto end
+:tag if
+echol Bingo! Your input is "a"
+goto end
+:tag end
+echo Program Exiting.
