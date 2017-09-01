@@ -17,9 +17,7 @@ namespace tmc {
             error = 0xff
         };
         Type type;
-        string arg1;
-        string arg2;
-        string arg3;
+        string args[3];
         bool hasVar;
     };
     
@@ -38,8 +36,8 @@ namespace tmc {
     {
 
         vector<Action> actions;
-        map<string, string> variables;
         map<string, size_t> tags;
+        map<string, string> variables;
 
         Action parseLine(const string &line, size_t n = 0)
         {
@@ -78,38 +76,38 @@ namespace tmc {
             switch (action.type)
             {
                 case Action::Type::Set:
-                    // set arg1 = arg2
-                    getUntil(ss, action.arg1, '=') || syntaxError(n);
-                    getUntil(ss, action.arg2, '\n', true, false);
+                    // set arg0 = arg1
+                    getUntil(ss, action.args[0], '=') || syntaxError(n);
+                    getUntil(ss, action.args[1], '\n', true, false);
                     break;
                 case Action::Type::Input:
-                    // input arg1
-                    getUntil(ss, action.arg1);
-                    action.arg1.size() > 0 || syntaxError(n);
+                    // input arg0
+                    getUntil(ss, action.args[0]);
+                    action.args[0].size() > 0 || syntaxError(n);
                     break;
                 case Action::Type::Echo:
                 case Action::Type::Echol:
-                    // echo arg1
-                    getUntil(ss, action.arg1, '\n', true, false);
+                    // echo arg0
+                    getUntil(ss, action.args[0], '\n', true, false);
                     break;
                 case Action::Type::Tag:
-                    // :tag arg1
-                    getUntil(ss, action.arg1);
-                    action.arg1.size() > 0 || syntaxError(n);
-                    setTag(n, action.arg1);
+                    // :tag arg0
+                    getUntil(ss, action.args[0]);
+                    action.args[0].size() > 0 || syntaxError(n);
+                    setTag(n, action.args[0]);
                     break;
                 case Action::Type::If:
-                    // if [arg1 = arg2] arg3(fork)
-                    getUntil(ss, action.arg1, '[') || syntaxError(n);
-                    getUntil(ss, action.arg1, '=') || syntaxError(n);
-                    getUntil(ss, action.arg2, ']') || syntaxError(n);
-                    getUntil(ss, action.arg3);
-                    action.arg3.size() > 0 || syntaxError(n);
+                    // if [arg0 = arg1] arg2(fork)
+                    getUntil(ss, action.args[0], '[') || syntaxError(n);
+                    getUntil(ss, action.args[0], '=') || syntaxError(n);
+                    getUntil(ss, action.args[1], ']') || syntaxError(n);
+                    getUntil(ss, action.args[2]);
+                    action.args[2].size() > 0 || syntaxError(n);
                     break;
                 case Action::Type::Goto:
-                    // goto arg1
-                    getUntil(ss, action.arg1);
-                    action.arg1.size() > 0 || syntaxError(n);
+                    // goto arg0
+                    getUntil(ss, action.args[0]);
+                    action.args[0].size() > 0 || syntaxError(n);
                     break;
                 case Action::Type::None:
                 default:
@@ -118,7 +116,7 @@ namespace tmc {
 
             // determine if there is variable in args
             action.hasVar = false;
-            for (auto &i : {action.arg1, action.arg2, action.arg3})
+            for (auto &i : action.args)
             {
                 auto it = i.begin();
                 // 0: waiting for '$'
@@ -156,6 +154,107 @@ namespace tmc {
             reset();
         }
 
+        /*
+          | len(4) |  tag   | ... |
+          | len(4) | action | ... |
+
+          tag:    | lineNumber(4) | len(4) | tagName(len) |
+          action: | type(4) | args: len(4), data(len) |
+        */
+        void compile(ofstream &fout)
+        {
+            char buff[256] = {};
+            int len;
+            // tags
+            len = tags.size();
+            memcpy(buff, &len, sizeof(len));
+            // len
+            fout.write(buff, sizeof(len));
+            for (auto it = tags.begin(); it != tags.end(); ++it)
+            {
+                // linenNumber
+                memcpy(buff, &it->second, sizeof(it->second));
+                fout.write(buff, sizeof(it->second));
+
+                len = it->first.size() + 1;
+                memcpy(buff, it->first.c_str(), len);
+                // len
+                fout.write((const char *)&len, sizeof(len));
+                // tagName
+                fout.write(buff, len);
+            }
+
+            // actions
+            len = actions.size();
+            memcpy(buff, &len, sizeof(len));
+            // len
+            fout.write(buff, sizeof(len));
+            for (auto it = actions.begin(); it != actions.end(); ++it)
+            {
+                // type
+                memcpy(buff, &it->type, sizeof(it->type));
+                fout.write(buff, sizeof(it->type));
+
+                // args
+                for (auto &i : it->args)
+                {
+                    len = i.size() + 1;
+                    memcpy(buff, i.c_str(), len);
+                    // len
+                    fout.write((const char *)&len, sizeof(len));
+                    // content
+                    fout.write(buff, len);
+                }
+            }
+        }
+
+        void load(ifstream &fin)
+        {
+            reset();
+            char buff[256] = {};
+            int len, count;
+            string tagName;
+            size_t tagN;
+            Action action;
+
+            // tags: len
+            fin.read(buff, sizeof(count));
+            memcpy(&count, buff, sizeof(count));
+            for (int i = 0; i < count; ++i)
+            {
+                // lineNumber
+                fin.read(buff, sizeof(tagN));
+                memcpy(&tagN, buff, sizeof(tagN));
+                // len
+                fin.read(buff, sizeof(len));
+                memcpy(&len, buff, sizeof(len));
+                // tagName
+                fin.read(buff, len);
+                tagName = buff;
+
+                tags.insert(make_pair(tagName, tagN));
+            }
+
+            // actions: len
+            fin.read(buff, sizeof(count));
+            memcpy(&count, buff, sizeof(count));
+            for (int i = 0; i < count; ++i)
+            {
+                // type
+                fin.read(buff, sizeof(action.type));
+                memcpy(&action.type, buff, sizeof(action.type));
+                // args
+                for (auto &i : action.args)
+                {
+                    fin.read(buff, sizeof(len));
+                    memcpy(&len, buff, sizeof(len));
+                    fin.read(buff, len);
+                    i = buff;
+                }
+                actions.emplace_back(action);
+            }
+        }
+
         void reset()
         {
             actions.clear();
@@ -191,32 +290,33 @@ namespace tmc {
             // extend var
             if (action.hasVar)
             {
-                action.arg1 = extendVariable(action.arg1);
-                action.arg2 = extendVariable(action.arg2);
-                action.arg3 = extendVariable(action.arg3);
+                for (auto &i : action.args)
+                {
+                    i = extendVariable(i);
+                }
             }
 
             switch (action.type)
             {
                 case Action::Type::Set:
-                    setVariable(action.arg1, action.arg2);
+                    setVariable(action.args[0], action.args[1]);
                     break;
                 case Action::Type::Input:
-                    getInput(action.arg1);
+                    getInput(action.args[0]);
                     break;
                 case Action::Type::Echo:
-                    print(action.arg1);
+                    print(action.args[0]);
                     break;
                 case Action::Type::Echol:
-                    print(action.arg1 + "\n");
+                    print(action.args[0] + "\n");
                     break;
                 case Action::Type::If:
                     // cout << "if[" << action.arg1 << "=" << action.arg2 << "]" << action.fork->type << endl;
-                    if (action.arg1 == action.arg2)
-                        return exec(parseLine(action.arg3, n), n);
+                    if (action.args[0] == action.args[1])
+                        return exec(parseLine(action.args[2], n), n);
                     break;
                 case Action::Type::Goto:
-                    return jump(action.arg1);
+                    return jump(action.args[0]);
                 case Action::Type::Tag:
                 default:
                     break;
