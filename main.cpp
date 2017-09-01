@@ -13,7 +13,7 @@ using namespace std;
 #define COMPILED_HEADER_SIZE 3
 #define COMPILED_HEADER "\x66\x66\x66"
 
-#define PWD 0x18
+#define PWD 0xf4
 
 void help()
 {
