@@ -2,6 +2,7 @@
 #include <iostream>
 #include <cstring>
 #include <string>
+#include <sstream>
 #include "parser.h"
 using namespace std;
 
@@ -11,6 +12,8 @@ using namespace std;
 
 #define COMPILED_HEADER_SIZE 3
 #define COMPILED_HEADER "\x66\x66\x66"
+
+#define PWD 0x18
 
 void help()
 {
@@ -22,6 +25,35 @@ Usage:
     Mbat compile scriptFile destFile    - Compile the script to unreadable script file
     Mbat scriptFile                     - Run the script
 )";
+}
+
+string crypt(const char *file, bool output = true)
+{
+    fstream f;
+    stringstream ss;
+    char buff;
+    f.open(file, ios::binary | ios::in);
+    while (f)
+    {
+        f.get(buff);
+        if (!f) break;
+        buff = buff ^ PWD;
+        ss.put(buff);
+    }
+    f.close();
+    if (output)
+    {
+        f.open(file, ios::binary | ios::out | ios::trunc);
+        ss.seekg(0);
+        while (ss)
+        {
+            ss.get(buff);
+            if (!ss) break;
+            f.put(buff);
+        }
+        return "";
+    }
+    return ss.str();
 }
 
 int main(int argc, char **argv)
@@ -69,13 +101,17 @@ int main(int argc, char **argv)
         }
         fout.write(COMPILED_HEADER, COMPILED_HEADER_SIZE);
         parser.compile(fout);
+        fout.close();
+        crypt(argv[3]);
         return 0;
     }
 
     char buff[COMPILED_HEADER_SIZE + 1] = {};
+    stringstream ss;
     // Mbat file
     if (argc == 2)
     {
+        ss.str(crypt(argv[1], false));
         fin.open(argv[1], ios::binary);
         if (!fin)
         {
@@ -83,11 +119,11 @@ int main(int argc, char **argv)
             return FILE_ERR;
         }
 
-        fin.read(buff, COMPILED_HEADER_SIZE);
+        ss.read(buff, COMPILED_HEADER_SIZE);
         if (strcmp(buff, COMPILED_HEADER) == 0)
         {
-            // compiled file
-            parser.load(fin);
+            // cryted compiled file
+            parser.load(ss);
         } else
         {
             // not compiled file

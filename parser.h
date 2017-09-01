@@ -1,3 +1,4 @@
+// 暂时不把声明与定义分开了
 #ifndef _H_PARSER_H_
 #define _H_PARSER_H_
 
@@ -161,7 +162,7 @@ namespace tmc {
           tag:    | lineNumber(4) | len(4) | tagName(len) |
           action: | type(4) | args: len(4), data(len) |
         */
-        void compile(ofstream &fout)
+        void compile(ostream &fout)
         {
             char buff[256] = {};
             int len;
@@ -208,7 +209,7 @@ namespace tmc {
             }
         }
 
-        void load(ifstream &fin)
+        void load(istream &fin)
         {
             reset();
             char buff[256] = {};
@@ -263,7 +264,7 @@ namespace tmc {
             tags["eof"] = INT_MAX;
         }
 
-        void parse(ifstream &in)
+        void parse(istream &in)
         {
             string temp;
             reset();
