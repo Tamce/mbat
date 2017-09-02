@@ -90,7 +90,8 @@ namespace tmc {
                 case Action::Type::Echo:
                 case Action::Type::Echol:
                     // echo arg0
-                    getUntil(ss, action.args[0], '\n', true, false);
+                    ss.get();       // remove one space
+                    getUntil(ss, action.args[0], '\n', false, false);
                     break;
                 case Action::Type::Tag:
                     // :tag arg0
