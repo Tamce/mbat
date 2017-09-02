@@ -1,3 +1,9 @@
+set var = 1
+echol ${var}
+add var 1
+echol ${var}
+goto eof
+
 set var = Nothing
 echo Input something > 
 input var

@@ -14,8 +14,8 @@ namespace tmc {
     struct Action
     {
         enum Type {
-            None, Set, Input, Echo, Tag, If, Goto, Echol,
-            error = 0xff
+            None, Set, Input, Echo, Tag, If, Goto, Echol, Add
+            , error = 0xff
         };
         Type type;
         string args[3];
@@ -30,7 +30,8 @@ namespace tmc {
         ":tag",
         "if",
         "goto",
-        "echol"
+        "echol",
+        "add"
     };
 
     class Parser
@@ -110,6 +111,11 @@ namespace tmc {
                     getUntil(ss, action.args[0]);
                     action.args[0].size() > 0 || syntaxError(n);
                     break;
+                case Action::Type::Add:
+                    // add var 123
+                    ss >> action.args[0];
+                    ss >> action.args[1];
+                    action.args[1].size() > 0 || syntaxError(n);
                 case Action::Type::None:
                 default:
                     break;
@@ -297,6 +303,8 @@ namespace tmc {
                 }
             }
 
+            static stringstream ss;
+            static int t1, t2;
             switch (action.type)
             {
                 case Action::Type::Set:
@@ -318,6 +326,17 @@ namespace tmc {
                     break;
                 case Action::Type::Goto:
                     return jump(action.args[0]);
+                case Action::Type::Add:
+                    ss.clear();
+                    ss.str("");
+                    ss << getVariable(action.args[0]) << " " << action.args[1];
+                    t1 = t2 = 0;
+                    ss >> t1 >> t2;
+                    ss.clear();
+                    ss.str("");
+                    ss << t1 + t2;
+                    setVariable(action.args[0], ss.str());
+                    break;
                 case Action::Type::Tag:
                 default:
                     break;
