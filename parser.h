@@ -422,8 +422,11 @@ namespace tmc {
             #ifdef DEBUG
             cout << "jump(" << tag << ")\n";
             #endif
-
-            return tags.at(tag);
+            if (tags.count(tag) > 0)
+                return tags.at(tag);
+            print("\n\nRuntime Error: Tag `" + tag + "` not found!");
+            // Jump to End-Of-File to end the script
+            return jump("eof");
         }
 
         /* Ignore the very first and ending blank characters */
