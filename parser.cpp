@@ -73,12 +73,11 @@ namespace tmc {
                 setTag(n, action.args[0]);
                 break;
             case Action::Type::If:
-                // if [arg0 = arg1] arg2(fork)
+                // if [arg0] arg1
                 getUntil(ss, action.args[0], '[') || syntaxError(n);
-                getUntil(ss, action.args[0], '=') || syntaxError(n);
-                getUntil(ss, action.args[1], ']') || syntaxError(n);
-                getUntil(ss, action.args[2]);
-                action.args[2].size() > 0 || syntaxError(n);
+                getUntil(ss, action.args[0], ']') || syntaxError(n);
+                getUntil(ss, action.args[1]);
+                action.args[1].size() > 0 || syntaxError(n);
                 break;
             case Action::Type::Goto:
                 // goto arg0
@@ -306,9 +305,37 @@ namespace tmc {
                 print(action.args[0] + "\n");
                 break;
             case Action::Type::If:
-                // cout << "if[" << action.arg1 << "=" << action.arg2 << "]" << action.fork->type << endl;
-                if (action.args[0] == action.args[1])
-                    return exec(parseLine(action.args[2], n), n);
+                // if [arg0] arg1
+                // abc def = efg
+                {
+                    bool pass = false;
+                    string s1, s2;
+                    auto pos = action.args[0].find("=");
+                    if (pos != string::npos)
+                    {
+                        s1 = action.args[0].substr(0, pos);
+                        // remove last blank characters
+                        if (string::npos != s1.find_last_not_of(" \t")) s1 = s1.substr(0, s1.find_last_not_of(" \t") + 1);
+                        s2 = action.args[0].substr(pos + 1);
+                        // remove the beginning blank chracters
+                        if (string::npos != s2.find_first_not_of(" \t")) s2 = s2.substr(s2.find_first_not_of(" \t"));
+                        if (s1 == s2) pass = true;
+                    } else
+                    {
+                        ss.clear();
+                        ss.str(action.args[0]);
+                        ss >> d1 >> c1 >> d2;
+                        if (ss.fail() || (c1 != '<' && c1 != '>'))
+                        {
+                            print("\n\nError evaluating expression `" + action.args[0] + "` in `if` condition.\n");
+                            return jump("eof");
+                        }
+                        if (c1 == '<') pass = d1 < d2;
+                        if (c1 == '>') pass = d1 > d2;
+                    }
+                    if (pass)
+                        return exec(parseLine(action.args[1], n), n);
+                }
                 break;
             case Action::Type::Goto:
                 return jump(action.args[0]);

@@ -4,6 +4,7 @@
 # 在除了命令的任何位置均可以使用变量，格式为 ${variableName}
 # 设置变量值
 set var = 0
+set MAX = 20
 # 输出然后换行
 echol var=${var}
 # 定义一个标签
@@ -15,10 +16,15 @@ input i
 # 计算一个表达式，结果保存到变量中，支持加减乘除和求模运算
 calc var = ${var} + ${i}
 echol var=${var}
-echo 要继续累加吗？(Y/N) 
+# if 语句，支持 `=,>,<` 三种比较，忽略比较符号前后的空白符
+if [${var} > ${MAX}] goto tooBig
+echo 要继续累加吗？(y/n) 
 input i
-# if 语句，只支持等号比较，条件成立则执行行后的语句
-if [${i} = Y] goto start
+if [${i} = y] goto start
 echol Bye!
 # 跳转语句，其中 eof 标签保留为文件末
+goto eof
+:tag tooBig
+echol 累加值已经超过预设值了~
+echol Bye!
 goto eof
