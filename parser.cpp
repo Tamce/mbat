@@ -11,8 +11,9 @@ namespace tmc {
         "if",
         "goto",
         "echol",
-        "add"
+        "calc"
     };
+
     Action Parser::parseLine(const string &line, size_t n)
     {
         Action action;
@@ -84,11 +85,12 @@ namespace tmc {
                 getUntil(ss, action.args[0]);
                 action.args[0].size() > 0 || syntaxError(n);
                 break;
-            case Action::Type::Add:
-                // add var 123
-                ss >> action.args[0];
-                ss >> action.args[1];
+            case Action::Type::Calc:
+                // calc var = 1+123
+                getUntil(ss, action.args[0], '=') || syntaxError(n);
+                getUntil(ss, action.args[1]);
                 action.args[1].size() > 0 || syntaxError(n);
+                break;
             case Action::Type::None:
             default:
                 break;
@@ -287,7 +289,8 @@ namespace tmc {
         }
 
         static stringstream ss;
-        static int t1, t2;
+        static double d1, d2;
+        static char c1;
         switch (action.type)
         {
             case Action::Type::Set:
@@ -309,15 +312,28 @@ namespace tmc {
                 break;
             case Action::Type::Goto:
                 return jump(action.args[0]);
-            case Action::Type::Add:
+            case Action::Type::Calc:
                 ss.clear();
-                ss.str("");
-                ss << getVariable(action.args[0]) << " " << action.args[1];
-                t1 = t2 = 0;
-                ss >> t1 >> t2;
-                ss.clear();
-                ss.str("");
-                ss << t1 + t2;
+                ss.str(action.args[1]);
+                d1 = d2 = c1 = 0;
+                ss >> d1 >> c1 >> d2;
+                if (ss.fail())
+                {
+                    print("\n\nRuntime Error: Cannot evaluate expression `" + action.args[1] + "`.\n");
+                    return jump("eof");
+                } else {
+                    ss.clear();
+                    ss.str("");
+                    switch (c1)
+                    {
+                        case '+': ss << d1 + d2; break;
+                        case '-': ss << d1 - d2; break;
+                        case '*': ss << d1 * d2; break;
+                        case '/': ss << d1 / d2; break;
+                        case '%': ss << (int)d1 % (int)d2; break;
+                        default: print("\n\nRuntime Error: Cannot evaluate expression `" + action.args[1] + "`.\n"); return jump("eof");
+                    }
+                }
                 setVariable(action.args[0], ss.str());
                 break;
             case Action::Type::Tag:

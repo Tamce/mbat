@@ -1,6 +1,6 @@
 set var = 1
 echol ${var}
-add var 1
+calc var = ${var} + 1
 echol ${var}
 goto eof
 

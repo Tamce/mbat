@@ -16,8 +16,9 @@ namespace tmc {
     using namespace std;
     struct Action
     {
-        enum Type {
-            None, Set, Input, Echo, Tag, If, Goto, Echol, Add
+        enum Type
+        {
+            None, Set, Input, Echo, Tag, If, Goto, Echol, Calc
             , error = 0xff
         };
         Type type;
