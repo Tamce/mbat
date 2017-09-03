@@ -1,17 +1,24 @@
-set var = 1
-echol ${var}
-calc var = ${var} + 1
-echol ${var}
-goto eof
+# MBat 语法演示
+# 以 # 开头的行为注释行
 
-set var = Nothing
-echo Input something > 
-input var
-echol Your input is "${var}"
-if [a = ${var}] goto if
-goto end
-:tag if
-echol Bingo! Your input is "a"
-goto end
-:tag end
-echo Program Exiting.
+# 在除了命令的任何位置均可以使用变量，格式为 ${variableName}
+# 设置变量值
+set var = 0
+# 输出然后换行
+echol var=${var}
+# 定义一个标签
+:tag start
+# 输出但不换行
+echo 输入一个数字来累加：
+# 输入一个值到变量中
+input i
+# 计算一个表达式，结果保存到变量中，支持加减乘除和求模运算
+calc var = ${var} + ${i}
+echol var=${var}
+echo 要继续累加吗？(Y/N) 
+input i
+# if 语句，只支持等号比较，条件成立则执行行后的语句
+if [${i} = Y] goto start
+echol Bye!
+# 跳转语句，其中 eof 标签保留为文件末
+goto eof
