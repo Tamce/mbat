@@ -1,0 +1,27 @@
+# 九九乘法表
+set i = 1
+# while (i < 10)
+:tag loop1
+if [${i} < 10] goto loop1-entry
+goto loop1-end
+:tag loop1-entry
+# {
+	set j = 1
+	# while (j < i)
+	:tag loop2
+	calc temp = ${i} + 1
+	if [${j} < ${temp}] goto loop2-entry
+	goto loop2-end
+	:tag loop2-entry
+	# {
+		calc result = ${i} * ${j}
+		echo ${j}*${i}=${result}	
+		calc j = ${j} + 1
+	# }
+	goto loop2
+	:tag loop2-end
+	echol
+	calc i = ${i} + 1
+# }
+goto loop1
+:tag loop1-end

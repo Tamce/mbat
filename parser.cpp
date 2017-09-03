@@ -19,7 +19,7 @@ namespace tmc {
         Action action;
 
         // empty line and comment
-        if (line == "" || line.at(0) == '#')
+        if (line == "" || line.at(line.find_first_not_of(" \t")) == '#')
         {
             action.type = Action::Type::None;
             return action;
