@@ -1,0 +1,70 @@
+# Array sort
+echol 请输入一列数字，输入 * 号结束输入
+set n = 0
+:tag inputBegin
+input temp
+if [${temp} = *] goto inputEnd
+set arr${n} = ${temp}
+calc n = ${n} + 1
+goto inputBegin
+:tag inputEnd
+
+# n 现在为总数，从此开始 n 不能改变，否则丢失对总数的追踪
+echol 你一共输入了 ${n} 个数字，他们分别是：
+# 模拟函数调用 printArr()
+set printArr() = #back1
+goto printArr()
+:tag #back1
+
+set sort() = #back2
+goto sort()
+:tag #back2
+
+echol
+echol 排序完毕后的数字为：
+set printArr() = #back3
+goto printArr()
+:tag #back3
+
+goto eof
+
+# ==== function:
+:tag printArr()
+set i = 0
+:tag loop-print?
+if [${i} < ${n}] goto loop-print-entry
+goto loop-print-end
+:tag loop-print-entry
+echo ${arr${i}} 
+calc i = ${i} + 1
+goto loop-print?
+:tag loop-print-end
+goto ${printArr()}
+
+
+# 经典冒泡排序
+:tag sort()
+set i = 0
+:tag loop-sort?
+if [${i} < ${n}] goto loop-sort-entry
+goto loop-sort-end
+:tag loop-sort-entry
+    set j = 0
+    :tag loop-sort2?
+    if [${j} < ${n}] goto loop-sort2-entry
+    goto loop-sort2-end
+    :tag loop-sort2-entry
+        if [${arr${i}} < ${arr${j}}] goto swap
+        goto noswap
+        :tag swap
+        set temp = ${arr${i}}
+        set arr${i} = ${arr${j}}
+        set arr${j} = ${temp}
+        :tag noswap
+    calc j = ${j} + 1
+    goto loop-sort2?
+    :tag loop-sort2-end
+calc i = ${i} + 1
+goto loop-sort?
+:tag loop-sort-end
+goto ${sort()}

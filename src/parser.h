@@ -1,4 +1,3 @@
-// 暂时不把声明与定义分开了
 #ifndef _H_PARSER_H_
 #define _H_PARSER_H_
 

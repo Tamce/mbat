@@ -1,0 +1,20 @@
+# 斐波那契数列
+echol 该程序输出 n 个斐波那契数列
+echo 请输入 n > 
+input n
+
+set a = 1
+set b = 1
+
+:tag loop?
+if [${n} > 0] goto loop
+goto loopEnd
+:tag loop
+# loop begin
+echo ${a} 
+calc b = ${a} + ${b}
+calc a = ${b} - ${a}
+calc n = ${n} - 1
+# loop end
+goto loop?
+:tag loopEnd
